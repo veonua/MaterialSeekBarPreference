@@ -4,4 +4,5 @@
     <string name="errors.and">And</string>
     <string name="enter_custom_value">Enter custom value</string>
     <string name="apply">apply</string>
+    <string name="format">%1$d %2$s</string>
 </resources>

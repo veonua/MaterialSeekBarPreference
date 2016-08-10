@@ -2,11 +2,11 @@ package com.pavelsikun.seekbarpreference;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.text.SpannableString;
+import android.text.style.UnderlineSpan;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -38,9 +38,7 @@ class PreferenceControllerDelegate implements SeekBar.OnSeekBarChangeListener, V
 
     private TextView valueView;
     private SeekBar seekBarView;
-    private TextView measurementView;
-    private LinearLayout valueHolderView;
-    private FrameLayout bottomLineView;
+    //private LinearLayout valueHolderView;
 
     //view stuff
     private TextView titleView, summaryView;
@@ -90,10 +88,9 @@ class PreferenceControllerDelegate implements SeekBar.OnSeekBarChangeListener, V
         else {
             TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.SeekBarPreference);
             try {
+                maxValue = a.getInt(R.styleable.SeekBarPreference_msbp_maxValue, DEFAULT_MAX_VALUE);
                 minValue = a.getInt(R.styleable.SeekBarPreference_msbp_minValue, DEFAULT_MIN_VALUE);
                 interval = a.getInt(R.styleable.SeekBarPreference_msbp_interval, DEFAULT_INTERVAL);
-                int saved_maxValue = a.getInt(R.styleable.SeekBarPreference_msbp_maxValue, DEFAULT_MAX_VALUE);
-                maxValue = (saved_maxValue - minValue) / interval;
                 dialogEnabled = a.getBoolean(R.styleable.SeekBarPreference_msbp_dialogEnabled, DEFAULT_DIALOG_ENABLED);
 
                 measurementUnit = a.getString(R.styleable.SeekBarPreference_msbp_measurementUnit);
@@ -132,19 +129,13 @@ class PreferenceControllerDelegate implements SeekBar.OnSeekBarChangeListener, V
         view.setClickable(false);
 
         seekBarView = (SeekBar) view.findViewById(R.id.seekbar);
-        measurementView = (TextView) view.findViewById(R.id.measurement_unit);
         valueView = (TextView) view.findViewById(R.id.seekbar_value);
 
         setMaxValue(maxValue);
         seekBarView.setOnSeekBarChangeListener(this);
 
-        measurementView.setText(measurementUnit);
-
         setCurrentValue(currentValue);
-        valueView.setText(String.valueOf(currentValue));
-
-        bottomLineView = (FrameLayout) view.findViewById(R.id.bottom_line);
-        valueHolderView = (LinearLayout) view.findViewById(R.id.value_holder);
+        updateText();
 
         setDialogEnabled(dialogEnabled);
         setEnabled(isEnabled());
@@ -160,7 +151,7 @@ class PreferenceControllerDelegate implements SeekBar.OnSeekBarChangeListener, V
             }
         }
         currentValue = newValue;
-        valueView.setText(String.valueOf(newValue));
+        updateText();
     }
 
     @Override
@@ -180,10 +171,9 @@ class PreferenceControllerDelegate implements SeekBar.OnSeekBarChangeListener, V
                     public boolean persistInt(int value) {
                         setCurrentValue(value);
                         seekBarView.setOnSeekBarChangeListener(null);
-                        seekBarView.setProgress(currentValue - minValue);
+                        seekBarView.setProgress((currentValue - minValue) / interval);
                         seekBarView.setOnSeekBarChangeListener(PreferenceControllerDelegate.this);
-
-                        valueView.setText(String.valueOf(currentValue));
+                        updateText();
                         return true;
                     }
                 })
@@ -228,15 +218,9 @@ class PreferenceControllerDelegate implements SeekBar.OnSeekBarChangeListener, V
             viewStateListener.setEnabled(enabled);
         }
 
-        if(seekBarView != null) { //theoretically might not always work
-            Log.d(TAG, "view is disabled!");
+        if(seekBarView != null) {
             seekBarView.setEnabled(enabled);
             valueView.setEnabled(enabled);
-            valueHolderView.setClickable(enabled);
-            valueHolderView.setEnabled(enabled);
-
-            measurementView.setEnabled(enabled);
-            bottomLineView.setEnabled(enabled);
 
             if(isView) {
                 titleView.setEnabled(enabled);
@@ -252,17 +236,10 @@ class PreferenceControllerDelegate implements SeekBar.OnSeekBarChangeListener, V
 
     void setMaxValue(int maxValue) {
         this.maxValue = maxValue;
+        if (seekBarView == null) return;
 
-        if (seekBarView != null) {
-            if (minValue <= 0 && maxValue >= 0) {
-                seekBarView.setMax(maxValue - minValue);
-            }
-            else {
-                seekBarView.setMax(maxValue);
-            }
-
-            seekBarView.setProgress(currentValue - minValue);
-        }
+        seekBarView.setMax((maxValue - minValue) / interval);
+        seekBarView.setProgress((currentValue - minValue) / interval);
     }
 
     int getMinValue() {
@@ -308,9 +285,15 @@ class PreferenceControllerDelegate implements SeekBar.OnSeekBarChangeListener, V
 
     void setMeasurementUnit(String measurementUnit) {
         this.measurementUnit = measurementUnit;
-        if(measurementView != null) {
-            measurementView.setText(measurementUnit);
-        }
+        updateText();
+    }
+
+    private void updateText() {
+        SpannableString content = new SpannableString(valueView.getResources().getString(R.string.format, currentValue, measurementUnit));
+        if (dialogEnabled)
+            content.setSpan(new UnderlineSpan(), 0, content.length(), 0);
+
+        valueView.setText(content);
     }
 
     boolean isDialogEnabled() {
@@ -320,10 +303,10 @@ class PreferenceControllerDelegate implements SeekBar.OnSeekBarChangeListener, V
     void setDialogEnabled(boolean dialogEnabled) {
         this.dialogEnabled = dialogEnabled;
 
-        if(valueHolderView != null && bottomLineView != null) {
-            valueHolderView.setOnClickListener(dialogEnabled ? this : null);
-            valueHolderView.setClickable(dialogEnabled);
-            bottomLineView.setVisibility(dialogEnabled ? View.VISIBLE : View.INVISIBLE);
+        if (valueView != null) {
+            valueView.setOnClickListener(dialogEnabled ? this : null);
+            valueView.setClickable(dialogEnabled);
+            updateText();
         }
     }
 
